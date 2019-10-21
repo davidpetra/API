@@ -1,3 +1,6 @@
+# SIMPLE API UNTUK MENYEDIAKAN INFORMASI MENGENAI PULSA DAN PAKET DATA ALL OPERATOR DARI SEBUAH AGEN PULSA
+# DAVID PETRA NATANAEL - 18217011
+
 import http.server
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 import base64
@@ -12,7 +15,7 @@ import json
 from urllib.parse import urlparse
 
 
-
+# Melakukan crawling data pulsa
 class PulsaSpider(scrapy.Spider):
     name = "pulsa"
 
@@ -37,7 +40,7 @@ class PulsaSpider(scrapy.Spider):
                 "status": row.xpath("td[4]//text()").get()
             }
 
-
+# Melakukan crawling data paket
 class PaketDataSpider(scrapy.Spider):
     name = "paketdata"
 
@@ -61,7 +64,7 @@ class PaketDataSpider(scrapy.Spider):
                 "status": row.xpath("td[4]//text()").get()
             }
 
-
+# Fungsi untuk menjalankan scrapy dalam script Python
 def hasilspider():
     results = []
 
@@ -85,13 +88,28 @@ with open("datapulsa.json","r") as a:
 with open("datapaketdata.json","r") as b:
     crawled_paket_data = json.load(b)
 
+# Cek provider untuk method GET
+def cekprovider(kodeprov):
+    result = []
+    for item in crawled_pulsa:
+        if kodeprov in item["kode"]:
+            test = {
+                "produk": item["produk"],
+                "jenis": item["jenis"],
+                "kode": item["kode"],
+                "harga": item["harga"],
+                "status": item["status"]
+            }
+            result.append(test)
+    return result
 
+# Request yang dijalankan client
 class Requests(http.server.SimpleHTTPRequestHandler):
     def _html(self, message):
-        
         content = f"<html><body><h1>{message}</h1></body></html>"
         return content.encode("utf8")
     
+    # Request GET
     def do_GET(self):
         parse = urlparse(self.path)
         path = parse.path
@@ -100,18 +118,48 @@ class Requests(http.server.SimpleHTTPRequestHandler):
         if path == "/pulsa":
             if query == "":
                 self.send_response(200)
-                self.send_header('Content-type', 'application/json')
+                self.send_header("Content-type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(crawled_pulsa).encode())
             else:
                 parameter = query.split("=")[0]
                 if parameter == "kode":
                     self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
+                    self.send_header("Content-type", "application/json")
                     self.end_headers()
                     kodepulsa = query.split("=")[1]
                     kodepulsa_parameter = next(item for item in crawled_pulsa if item["kode"] == kodepulsa)
                     self.wfile.write(json.dumps(kodepulsa_parameter).encode())
+                elif parameter == "provider":
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    providerpulsa = query.split("=")[1]
+                    if providerpulsa == "axis":
+                        kodeprov = "AX"
+                        providerpulsa_parameter = cekprovider(kodeprov)
+                        self.wfile.write(json.dumps(providerpulsa_parameter).encode())
+                    elif providerpulsa == "indosat":
+                        kodeprov = "I"
+                        providerpulsa_parameter = cekprovider(kodeprov)
+                        self.wfile.write(json.dumps(providerpulsa_parameter).encode())
+                    elif providerpulsa == "telkomsel":
+                        kodeprov = "S"
+                        providerpulsa_parameter = cekprovider(kodeprov)
+                        self.wfile.write(json.dumps(providerpulsa_parameter).encode())
+                    elif providerpulsa == "tri":
+                        kodeprov = "T"
+                        providerpulsa_parameter = cekprovider(kodeprov)
+                        self.wfile.write(json.dumps(providerpulsa_parameter).encode())
+                    elif providerpulsa == "xl":
+                        kodeprov = "X"
+                        providerpulsa_parameter = cekprovider(kodeprov)
+                        self.wfile.write(json.dumps(providerpulsa_parameter).encode())
+                    else:
+                        self.send_response(404)
+                        self.send_header("Content-type", "text/html")
+                        self.end_headers()
+                        self.wfile.write(self._html("Error 404 Not Found"))
                 else:
                     self.send_response(404)
                     self.send_header("Content-type", "text/html")
@@ -120,14 +168,14 @@ class Requests(http.server.SimpleHTTPRequestHandler):
         elif path == "/paketdata":
             if query == "":
                 self.send_response(200)
-                self.send_header('Content-type', 'application/json')
+                self.send_header("Content-type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps(crawled_paket_data).encode())
             else:
                 parameter = query.split("=")[0]
                 if parameter == "kode":
                     self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
+                    self.send_header("Content-type", "application/json")
                     self.end_headers()
                     kodepaketdata = query.split("=")[1]
                     kodepaketdata_parameter = next(item for item in crawled_paket_data if item["kode"] == kodepaketdata)
@@ -143,6 +191,7 @@ class Requests(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(self._html("Error 404 Not Found"))
 
+# Menjalankan HTTP Server
 port = 8000
 try:
     with HTTPServer(("",port), Requests) as httpd:
